@@ -2,13 +2,18 @@ import * as vscode from 'vscode';
 import { GitDiffParser } from './diff/GitDiffParser';
 import { DiffTreeDataProvider } from './views/DiffTreeDataProvider';
 import { DiffPreviewPanel } from './views/DiffPreviewPanel';
-import { FileDiff } from './diff/types';
+import { OverlayWebview } from './webview/OverlayWebview';
+import { FileDiff, Hunk } from './diff/types';
 
 let diffTreeProvider: DiffTreeDataProvider;
 let diffFiles: FileDiff[] = [];
+let overlayWebview: OverlayWebview;
 
 export function activate(context: vscode.ExtensionContext) {
   console.log('Diff Review extension activated');
+
+  // 初始化 OverlayWebview
+  overlayWebview = new OverlayWebview(context.extensionUri);
 
   diffTreeProvider = new DiffTreeDataProvider();
 
@@ -26,6 +31,8 @@ export function activate(context: vscode.ExtensionContext) {
           const hunk = file.hunks.find(h => h.id === element.id);
           if (hunk) {
             DiffPreviewPanel.createOrShow(context.extensionUri, file);
+            // 显示 OverlayWebview 接受/拒绝按钮
+            overlayWebview.showButtons([{ hunk, fileDiff: file }]);
             break;
           }
         }
@@ -41,7 +48,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.executeCommand('workbench.view.extension.diffReviewView');
   });
 
-  context.subscriptions.push(command, view);
+  context.subscriptions.push(command, view, overlayWebview);
 }
 
 export function deactivate() {}
