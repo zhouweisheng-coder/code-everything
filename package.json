@@ -34,6 +34,21 @@
           "name": "Diff Review"
         }
       ]
+    },
+    "configuration": {
+      "title": "Diff Review",
+      "properties": {
+        "diffReview.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Diff Review extension"
+        },
+        "diffReview.autoRefresh": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto refresh on file changes"
+        }
+      }
     }
   },
   "scripts": {

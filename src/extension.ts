@@ -12,6 +12,16 @@ let overlayWebview: OverlayWebview;
 export function activate(context: vscode.ExtensionContext) {
   console.log('Diff Review extension activated');
 
+  // 获取配置
+  const config = vscode.workspace.getConfiguration('diffReview');
+  const enabled = config.get<boolean>('enabled', true);
+  const autoRefresh = config.get<boolean>('autoRefresh', true);
+
+  if (!enabled) {
+    vscode.window.showInformationMessage('Diff Review is disabled');
+    return;
+  }
+
   // 初始化 OverlayWebview
   overlayWebview = new OverlayWebview(context.extensionUri);
 
