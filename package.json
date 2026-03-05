@@ -1,0 +1,47 @@
+{
+  "name": "diff-review",
+  "displayName": "Diff Review",
+  "description": "Git diff review with accept/reject buttons",
+  "version": "0.0.1",
+  "publisher": "local",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onCommand:extension.showDiffPanel"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "extension.showDiffPanel",
+        "title": "Show Diff Review"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "extension.showDiffPanel",
+        "key": "Ctrl+Alt+D"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "test": "node ./out/test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^18.0.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/test-electron": "^2.3.0",
+    "glob": "^13.0.6",
+    "mocha": "^11.7.5",
+    "typescript": "^5.0.0"
+  }
+}
