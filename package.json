@@ -26,7 +26,15 @@
         "command": "extension.showDiffPanel",
         "key": "Ctrl+Alt+D"
       }
-    ]
+    ],
+    "views": {
+      "explorer": [
+        {
+          "id": "diffReviewView",
+          "name": "Diff Review"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
