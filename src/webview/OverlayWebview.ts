@@ -1,11 +1,15 @@
 import * as vscode from 'vscode';
 import { Hunk, FileDiff } from '../diff/types';
+import { HunkActionHandler } from '../actions/HunkActionHandler';
 
 export class OverlayWebview {
   private panel: vscode.WebviewPanel | undefined;
   private hunks: { hunk: Hunk; fileDiff: FileDiff }[] = [];
+  private actionHandler: HunkActionHandler;
 
-  constructor(private extensionUri: vscode.Uri) {}
+  constructor(private extensionUri: vscode.Uri) {
+    this.actionHandler = new HunkActionHandler();
+  }
 
   public showButtons(hunks: { hunk: Hunk; fileDiff: FileDiff }[]) {
     this.hunks = hunks;
@@ -80,13 +84,17 @@ export class OverlayWebview {
   }
 
   private async handleAccept(hunkId: string, filePath: string) {
-    vscode.window.showInformationMessage(`Accept hunk: ${hunkId} for file: ${filePath}`);
-    // TODO: 调用 HunkActionHandler
+    const target = this.hunks.find(h => h.hunk.id === hunkId && h.fileDiff.filePath === filePath);
+    if (target) {
+      await this.actionHandler.acceptHunk(target.fileDiff, target.hunk);
+    }
   }
 
   private async handleReject(hunkId: string, filePath: string) {
-    vscode.window.showInformationMessage(`Reject hunk: ${hunkId} for file: ${filePath}`);
-    // TODO: 调用 HunkActionHandler
+    const target = this.hunks.find(h => h.hunk.id === hunkId && h.fileDiff.filePath === filePath);
+    if (target) {
+      await this.actionHandler.rejectHunk(target.fileDiff, target.hunk);
+    }
   }
 
   public hideButtons() {
