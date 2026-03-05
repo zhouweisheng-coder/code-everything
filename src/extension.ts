@@ -30,7 +30,8 @@ export function activate(context: vscode.ExtensionContext) {
         for (const file of diffFiles) {
           const hunk = file.hunks.find(h => h.id === element.id);
           if (hunk) {
-            DiffPreviewPanel.createOrShow(context.extensionUri, file);
+            // 只显示选中的 hunk 内容
+            DiffPreviewPanel.createOrShow(context.extensionUri, file, hunk);
             // 显示 OverlayWebview 接受/拒绝按钮
             overlayWebview.showButtons([{ hunk, fileDiff: file }]);
             break;

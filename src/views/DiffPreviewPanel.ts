@@ -5,6 +5,8 @@ export class DiffPreviewPanel {
   public static currentPanel: DiffPreviewPanel | undefined;
   private readonly panel: vscode.WebviewPanel;
   private readonly extensionUri: vscode.Uri;
+  private currentFileDiff: FileDiff | undefined;
+  private currentHunk: Hunk | undefined;
 
   private constructor(
     extensionUri: vscode.Uri,
@@ -25,7 +27,7 @@ export class DiffPreviewPanel {
     this.panel.webview.html = this.getHtmlForWebview('');
   }
 
-  public static createOrShow(extensionUri: vscode.Uri, fileDiff: FileDiff) {
+  public static createOrShow(extensionUri: vscode.Uri, fileDiff: FileDiff, hunk?: Hunk) {
     const column = vscode.window.activeTextEditor
       ? vscode.window.activeTextEditor.viewColumn
       : vscode.ViewColumn.One;
@@ -35,16 +37,26 @@ export class DiffPreviewPanel {
 
     if (DiffPreviewPanel.currentPanel) {
       DiffPreviewPanel.currentPanel.panel.reveal(safeColumn);
-      DiffPreviewPanel.currentPanel.updateContent(fileDiff);
+      DiffPreviewPanel.currentPanel.updateContent(fileDiff, hunk);
       return;
     }
 
     DiffPreviewPanel.currentPanel = new DiffPreviewPanel(extensionUri, safeColumn);
-    DiffPreviewPanel.currentPanel.updateContent(fileDiff);
+    DiffPreviewPanel.currentPanel.updateContent(fileDiff, hunk);
   }
 
-  private updateContent(fileDiff: FileDiff) {
-    const content = fileDiff.hunks.map(hunk => this.renderHunk(hunk)).join('\n');
+  private updateContent(fileDiff: FileDiff, hunk?: Hunk) {
+    this.currentFileDiff = fileDiff;
+    this.currentHunk = hunk;
+
+    let content: string;
+    if (hunk) {
+      // 只显示选中的 hunk
+      content = this.renderHunk(hunk);
+    } else {
+      // 显示文件的所有 hunks
+      content = fileDiff.hunks.map(h => this.renderHunk(h)).join('\n');
+    }
     this.panel.webview.html = this.getHtmlForWebview(content);
   }
 
