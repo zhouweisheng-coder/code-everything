@@ -13,23 +13,29 @@ export class InlineButtonRenderer {
   constructor() {
     this.actionHandler = new HunkActionHandler();
 
-    // 创建 Accept 按钮装饰 (右侧)
+    // 创建 Accept 按钮装饰 (行尾)
     this.acceptDecoration = vscode.window.createTextEditorDecorationType({
+      isWholeLine: true,
       after: {
-        contentText: ' ✓ ',
+        contentText: ' ✓ Accept ',
         backgroundColor: '#4CAF50',
         color: '#ffffff',
-        margin: '0 0 0 8px',
+        
+        margin: '0 0 0 10px',
+        fontWeight: 'bold'
       }
     });
 
-    // 创建 Reject 按钮装饰 (左侧)
+    // 创建 Reject 按钮装饰 (行首)
     this.rejectDecoration = vscode.window.createTextEditorDecorationType({
+      isWholeLine: true,
       before: {
-        contentText: ' ✗ ',
+        contentText: ' Reject ✗ ',
         backgroundColor: '#f44336',
         color: '#ffffff',
-        margin: '0 8px 0 0',
+        
+        margin: '0 10px 0 0',
+        fontWeight: 'bold'
       }
     });
   }
@@ -38,33 +44,40 @@ export class InlineButtonRenderer {
     editor: vscode.TextEditor,
     decorations: EditorDecoration[]
   ): Promise<void> {
+    console.log('[InlineButtonRenderer] Rendering buttons for', decorations.length, 'decorations');
+    
     const acceptOptions: vscode.DecorationOptions[] = [];
     const rejectOptions: vscode.DecorationOptions[] = [];
 
     for (const dec of decorations) {
       const line = dec.range.start.line;
+      console.log('[InlineButtonRenderer] Adding decoration at line', line);
 
-      // Accept 按钮：行尾
+      // Accept 按钮：整行，行尾显示
       acceptOptions.push({
         range: new vscode.Range(line, 0, line, 0),
-        hoverMessage: 'Accept this change'
+        hoverMessage: 'Click to Accept this change'
       });
 
-      // Reject 按钮：行首
+      // Reject 按钮：整行，行首显示
       rejectOptions.push({
         range: new vscode.Range(line, 0, line, 0),
-        hoverMessage: 'Reject this change'
+        hoverMessage: 'Click to Reject this change'
       });
     }
 
+    console.log('[InlineButtonRenderer] Setting accept decorations:', acceptOptions.length);
+    console.log('[InlineButtonRenderer] Setting reject decorations:', rejectOptions.length);
+    
     editor.setDecorations(this.acceptDecoration, acceptOptions);
     editor.setDecorations(this.rejectDecoration, rejectOptions);
 
-    // 存储当前装饰器以便清除
     this.currentDecorations.set(editor.document.uri.toString(), [
       ...acceptOptions,
       ...rejectOptions
     ]);
+    
+    console.log('[InlineButtonRenderer] Decorations set complete');
   }
 
   clearButtons(): void {

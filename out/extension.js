@@ -37,46 +37,120 @@ exports.activate = activate;
 exports.deactivate = deactivate;
 const vscode = __importStar(require("vscode"));
 const GitDiffParser_1 = require("./diff/GitDiffParser");
-const DiffTreeDataProvider_1 = require("./views/DiffTreeDataProvider");
-const DiffPreviewPanel_1 = require("./views/DiffPreviewPanel");
-const OverlayWebview_1 = require("./webview/OverlayWebview");
-let diffTreeProvider;
-let diffFiles = [];
-let overlayWebview;
+const EditorPositionMapper_1 = require("./mapper/EditorPositionMapper");
+const InlineButtonRenderer_1 = require("./renderer/InlineButtonRenderer");
+let positionMapper;
+let buttonRenderer;
+let currentFiles = [];
 function activate(context) {
     console.log('Diff Review extension activated');
-    // 初始化 OverlayWebview
-    overlayWebview = new OverlayWebview_1.OverlayWebview(context.extensionUri);
-    diffTreeProvider = new DiffTreeDataProvider_1.DiffTreeDataProvider();
-    // 创建 TreeView 并监听选择变化
-    const view = vscode.window.createTreeView('diffReviewView', {
-        treeDataProvider: diffTreeProvider
+    vscode.window.showInformationMessage('Diff Review loaded! Press Ctrl+Alt+D for inline buttons.');
+    // 初始化组件
+    positionMapper = new EditorPositionMapper_1.EditorPositionMapper();
+    buttonRenderer = new InlineButtonRenderer_1.InlineButtonRenderer();
+    // 获取配置
+    const config = vscode.workspace.getConfiguration('diffReview');
+    const enabled = config.get('enabled', true);
+    if (!enabled) {
+        vscode.window.showInformationMessage('Diff Review is disabled');
+        return;
+    }
+    // 注册显示内联按钮命令
+    const showCommand = vscode.commands.registerCommand('extension.showInlineButtons', async () => {
+        console.log('[DiffReview] Show inline buttons command triggered');
+        try {
+            const parser = new GitDiffParser_1.GitDiffParser();
+            const result = await parser.parse();
+            console.log('[DiffReview] Found files:', result.files.length);
+            if (result.files.length === 0) {
+                vscode.window.showInformationMessage('No uncommitted changes found');
+                return;
+            }
+            currentFiles = result.files;
+            vscode.window.showInformationMessage(`Found ${result.files.length} file(s) with changes`);
+            // 为每个文件打开编辑器并显示按钮
+            for (const file of result.files) {
+                console.log('[DiffReview] Processing file:', file.filePath);
+                const decorations = await positionMapper.mapHunksToEditor(file);
+                const editor = vscode.window.activeTextEditor;
+                if (editor) {
+                    await buttonRenderer.renderButtons(editor, decorations);
+                }
+            }
+        }
+        catch (error) {
+            console.error('[DiffReview] Error:', error);
+            vscode.window.showErrorMessage(`Error: ${error.message}`);
+        }
     });
-    view.onDidChangeSelection(async (e) => {
-        if (e.selection && e.selection.length > 0) {
-            const element = e.selection[0];
-            if (element.contextValue === 'hunk') {
-                // 查找对应的文件和 hunk
-                for (const file of diffFiles) {
-                    const hunk = file.hunks.find(h => h.id === element.id);
-                    if (hunk) {
-                        // 只显示选中的 hunk 内容
-                        DiffPreviewPanel_1.DiffPreviewPanel.createOrShow(context.extensionUri, file, hunk);
-                        // 显示 OverlayWebview 接受/拒绝按钮
-                        overlayWebview.showButtons([{ hunk, fileDiff: file }]);
-                        break;
+    // 注册隐藏内联按钮命令
+    const hideCommand = vscode.commands.registerCommand('extension.hideInlineButtons', () => {
+        buttonRenderer.clearButtons();
+        vscode.window.showInformationMessage('Buttons hidden');
+    });
+    // 添加点击检测
+    const selectionDisposable = vscode.window.onDidChangeTextEditorSelection(async (event) => {
+        if (!event.textEditor || currentFiles.length === 0)
+            return;
+        const selection = event.selections[0];
+        if (!selection)
+            return;
+        const document = event.textEditor.document;
+        const position = selection.active;
+        const line = position.line;
+        const char = position.character;
+        const lineContent = document.lineAt(line).text;
+        // 检测行尾 - Accept
+        if (char >= lineContent.length - 3) {
+            const file = currentFiles.find(f => {
+                return f.hunks.some(h => {
+                    const hunkStart = h.oldStart - 1;
+                    const hunkEnd = hunkStart + h.oldLines;
+                    return line >= hunkStart && line < hunkEnd;
+                });
+            });
+            if (file) {
+                const hunk = file.hunks.find(h => {
+                    const hunkStart = h.oldStart - 1;
+                    const hunkEnd = hunkStart + h.oldLines;
+                    return line >= hunkStart && line < hunkEnd;
+                });
+                if (hunk) {
+                    const answer = await vscode.window.showInformationMessage(`Accept change in ${file.filePath}?`, 'Yes', 'No');
+                    if (answer === 'Yes') {
+                        await buttonRenderer.handleAccept(file, hunk);
+                        vscode.commands.executeCommand('extension.showInlineButtons');
+                    }
+                }
+            }
+        }
+        // 检测行头 - Reject
+        if (char <= 3 && char > 0) {
+            const file = currentFiles.find(f => {
+                return f.hunks.some(h => {
+                    const hunkStart = h.oldStart - 1;
+                    const hunkEnd = hunkStart + h.oldLines;
+                    return line >= hunkStart && line < hunkEnd;
+                });
+            });
+            if (file) {
+                const hunk = file.hunks.find(h => {
+                    const hunkStart = h.oldStart - 1;
+                    const hunkEnd = hunkStart + h.oldLines;
+                    return line >= hunkStart && line < hunkEnd;
+                });
+                if (hunk) {
+                    const answer = await vscode.window.showInformationMessage(`Reject change in ${file.filePath}?`, 'Yes', 'No');
+                    if (answer === 'Yes') {
+                        await buttonRenderer.handleReject(file, hunk);
+                        vscode.commands.executeCommand('extension.showInlineButtons');
                     }
                 }
             }
         }
     });
-    const command = vscode.commands.registerCommand('extension.showDiffPanel', async () => {
-        const parser = new GitDiffParser_1.GitDiffParser();
-        const result = await parser.parse();
-        diffFiles = result.files;
-        diffTreeProvider.updateFiles(result.files);
-        vscode.commands.executeCommand('workbench.view.extension.diffReviewView');
-    });
-    context.subscriptions.push(command, view, overlayWebview);
+    context.subscriptions.push(showCommand, hideCommand, buttonRenderer, selectionDisposable);
 }
-function deactivate() { }
+function deactivate() {
+    buttonRenderer?.dispose();
+}
