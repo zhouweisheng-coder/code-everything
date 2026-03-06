@@ -93,6 +93,86 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.window.showInformationMessage('Buttons hidden');
   });
 
+  // 添加点击检测 - 检测光标位置的点击
+  const selectionDisposable = vscode.window.onDidChangeTextEditorSelection(async (event) => {
+    if (!event.textEditor) return;
+
+    const selection = event.selections[0];
+    if (!selection) return;
+
+    // 检查是否是点击（光标没有移动但点击了）
+    const document = event.textEditor.document;
+    const position = selection.active;
+    const line = position.line;
+    const char = position.character;
+
+    // 获取当前行内容
+    const lineContent = document.lineAt(line).text;
+
+    // 检测是否点击了行尾区域 (Accept) - 点击行末尾附近
+    if (char >= lineContent.length - 3) {
+      // 查找对应的 file 和 hunk
+      const file = currentFiles.find(f => {
+        // 简单匹配：检查这行是否在某个 hunk 的范围内
+        return f.hunks.some(h => {
+          const hunkStart = h.oldStart - 1;
+          const hunkEnd = hunkStart + h.oldLines;
+          return line >= hunkStart && line < hunkEnd;
+        });
+      });
+
+      if (file) {
+        const hunk = file.hunks.find(h => {
+          const hunkStart = h.oldStart - 1;
+          const hunkEnd = hunkStart + h.oldLines;
+          return line >= hunkStart && line < hunkEnd;
+        });
+
+        if (hunk) {
+          const answer = await vscode.window.showInformationMessage(
+            `Accept change in ${file.filePath}?`,
+            'Yes', 'No'
+          );
+          if (answer === 'Yes') {
+            await buttonRenderer.handleAccept(file, hunk);
+            // 刷新
+            vscode.commands.executeCommand('extension.showInlineButtons');
+          }
+        }
+      }
+    }
+
+    // 检测是否点击了行头区域 (Reject)
+    if (char <= 3 && char > 0) {
+      const file = currentFiles.find(f => {
+        return f.hunks.some(h => {
+          const hunkStart = h.oldStart - 1;
+          const hunkEnd = hunkStart + h.oldLines;
+          return line >= hunkStart && line < hunkEnd;
+        });
+      });
+
+      if (file) {
+        const hunk = file.hunks.find(h => {
+          const hunkStart = h.oldStart - 1;
+          const hunkEnd = hunkStart + h.oldLines;
+          return line >= hunkStart && line < hunkEnd;
+        });
+
+        if (hunk) {
+          const answer = await vscode.window.showInformationMessage(
+            `Reject change in ${file.filePath}?`,
+            'Yes', 'No'
+          );
+          if (answer === 'Yes') {
+            await buttonRenderer.handleReject(file, hunk);
+            vscode.commands.executeCommand('extension.showInlineButtons');
+          }
+        }
+      }
+    }
+  });
+
   const command = vscode.commands.registerCommand('extension.showDiffPanel', async () => {
     const parser = new GitDiffParser();
     const result = await parser.parse();
@@ -101,7 +181,7 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.executeCommand('workbench.view.extension.diffReviewView');
   });
 
-  context.subscriptions.push(showCommand, hideCommand, command, view, overlayWebview, buttonRenderer);
+  context.subscriptions.push(showCommand, hideCommand, command, view, overlayWebview, buttonRenderer, selectionDisposable);
 }
 
 export function deactivate() {
