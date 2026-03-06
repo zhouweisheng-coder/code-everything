@@ -1,16 +1,25 @@
 import * as vscode from 'vscode';
 import { GitDiffParser } from './diff/GitDiffParser';
+import { EditorPositionMapper } from './mapper/EditorPositionMapper';
+import { InlineButtonRenderer } from './renderer/InlineButtonRenderer';
 import { DiffTreeDataProvider } from './views/DiffTreeDataProvider';
 import { DiffPreviewPanel } from './views/DiffPreviewPanel';
 import { OverlayWebview } from './webview/OverlayWebview';
 import { FileDiff, Hunk } from './diff/types';
 
+let positionMapper: EditorPositionMapper;
+let buttonRenderer: InlineButtonRenderer;
 let diffTreeProvider: DiffTreeDataProvider;
 let diffFiles: FileDiff[] = [];
 let overlayWebview: OverlayWebview;
+let currentFiles: FileDiff[] = [];
 
 export function activate(context: vscode.ExtensionContext) {
   console.log('Diff Review extension activated');
+
+  // 初始化内联按钮组件
+  positionMapper = new EditorPositionMapper();
+  buttonRenderer = new InlineButtonRenderer();
 
   // 获取配置
   const config = vscode.workspace.getConfiguration('diffReview');
@@ -51,6 +60,39 @@ export function activate(context: vscode.ExtensionContext) {
     }
   });
 
+  // 注册显示内联按钮命令
+  const showCommand = vscode.commands.registerCommand('extension.showInlineButtons', async () => {
+    try {
+      const parser = new GitDiffParser();
+      const result = await parser.parse();
+
+      if (result.files.length === 0) {
+        vscode.window.showInformationMessage('No uncommitted changes found');
+        return;
+      }
+
+      currentFiles = result.files;
+      vscode.window.showInformationMessage(`Found ${result.files.length} file(s) with changes`);
+
+      // 为每个文件打开编辑器并显示按钮
+      for (const file of result.files) {
+        const decorations = await positionMapper.mapHunksToEditor(file);
+        const editor = vscode.window.activeTextEditor;
+        if (editor) {
+          await buttonRenderer.renderButtons(editor, decorations);
+        }
+      }
+    } catch (error: any) {
+      vscode.window.showErrorMessage(`Error: ${error.message}`);
+    }
+  });
+
+  // 注册隐藏内联按钮命令
+  const hideCommand = vscode.commands.registerCommand('extension.hideInlineButtons', () => {
+    buttonRenderer.clearButtons();
+    vscode.window.showInformationMessage('Buttons hidden');
+  });
+
   const command = vscode.commands.registerCommand('extension.showDiffPanel', async () => {
     const parser = new GitDiffParser();
     const result = await parser.parse();
@@ -59,7 +101,9 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.executeCommand('workbench.view.extension.diffReviewView');
   });
 
-  context.subscriptions.push(command, view, overlayWebview);
+  context.subscriptions.push(showCommand, hideCommand, command, view, overlayWebview, buttonRenderer);
 }
 
-export function deactivate() {}
+export function deactivate() {
+  buttonRenderer?.dispose();
+}

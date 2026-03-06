@@ -19,12 +19,24 @@
       {
         "command": "extension.showDiffPanel",
         "title": "Show Diff Review"
+      },
+      {
+        "command": "extension.showInlineButtons",
+        "title": "Show Inline Buttons"
+      },
+      {
+        "command": "extension.hideInlineButtons",
+        "title": "Hide Inline Buttons"
       }
     ],
     "keybindings": [
       {
         "command": "extension.showDiffPanel",
         "key": "Ctrl+Alt+D"
+      },
+      {
+        "command": "extension.showInlineButtons",
+        "key": "Ctrl+Alt+B"
       }
     ],
     "views": {
